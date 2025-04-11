@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Volume Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    label, select, input { margin-right: 1rem; }
+    canvas { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h2>📊 Crypto Volume by Market</h2>
+  <div>
+    <label for="coinSelect">Select Coin:</label>
+    <select id="coinSelect">
+      <option value="bitcoin" data-symbol="BTC">Bitcoin (BTC)</option>
+      <option value="ethereum" data-symbol="ETH">Ethereum (ETH)</option>
+      <option value="solana" data-symbol="SOL">Solana (SOL)</option>
+      <option value="ripple" data-symbol="XRP">Ripple (XRP)</option>
+    </select>
+
+    <p><strong>Base:</strong> Coin selected above &nbsp;&nbsp; | &nbsp;&nbsp; <strong>Target:</strong> USDT (fixed)</p>
+
+    <button onclick="updateChart()">Update Chart</button>
+  </div>
+
+  <canvas id="volumeChart" width="800" height="400"></canvas>
+
+  <script>
+    const coinSelect = document.getElementById('coinSelect');
+    let chart;
+
+    async function updateChart() {
+      const coinId = coinSelect.value;
+      const selectedOption = coinSelect.options[coinSelect.selectedIndex];
+      const symbol = selectedOption.getAttribute('data-symbol').toUpperCase();
+
+      const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/tickers`);
+      const data = await res.json();
+
+      const filtered = data.tickers.filter(ticker => {
+        return ticker.base.toUpperCase() === symbol &&
+               ticker.target.toUpperCase() === 'USDT';
+      });
+
+      const labels = filtered.map(t => t.market.name);
+      const volumes = filtered.map(t => t.volume);
+
+      if (chart) chart.destroy();
+
+      const ctx = document.getElementById('volumeChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Volume (24h)',
+            data: volumes,
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true },
+            title: {
+              display: true,
+              text: `24h Volume by Market (${symbol} / USDT)`
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Volume' }
+            },
+            x: {
+              title: { display: true, text: 'Exchange Market' }
+            }
+          }
+        }
+      });
+    }
+
+    coinSelect.addEventListener('change', updateChart);
+    updateChart();
+  </script>
+</body>
+</html>
