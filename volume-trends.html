@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Volume Trends</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; }
+    label, select { margin-right: 1rem; }
+    canvas { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h2>📈 Volume Over Time</h2>
+  <div>
+    <label for="coinSelect">Select Coin:</label>
+    <select id="coinSelect">
+      <option value="bitcoin">Bitcoin (BTC)</option>
+      <option value="ethereum">Ethereum (ETH)</option>
+      <option value="solana">Solana (SOL)</option>
+      <option value="ripple">Ripple (XRP)</option>
+    </select>
+
+    <label for="plotType">Select Plot Type:</label>
+    <select id="plotType">
+      <option value="daily">Daily Volume</option>
+      <option value="hourly">Hourly Volume Pattern</option>
+    </select>
+
+    <button onclick="updateVolumeChart()">Update Chart</button>
+  </div>
+
+  <canvas id="volumeChart" width="900" height="400"></canvas>
+
+  <script>
+    const coinSelect = document.getElementById('coinSelect');
+    const plotTypeSelect = document.getElementById('plotType');
+    let chart;
+
+    async function updateVolumeChart() {
+      const coinId = coinSelect.value;
+      const plotType = plotTypeSelect.value;
+
+      const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30`);
+      const data = await res.json();
+      const volumes = data.total_volumes;
+
+      let labels = [];
+      let volumeData = [];
+
+      if (plotType === 'daily') {
+        const dailyMap = {};
+        volumes.forEach(([timestamp, volume]) => {
+          const date = new Date(timestamp).toISOString().split('T')[0];
+          dailyMap[date] = (dailyMap[date] || 0) + volume;
+        });
+        labels = Object.keys(dailyMap);
+        volumeData = Object.values(dailyMap);
+      } else if (plotType === 'hourly') {
+        const hourlyMap = Array(24).fill(0);
+        const hourlyCounts = Array(24).fill(0);
+
+        volumes.forEach(([timestamp, volume]) => {
+          const date = new Date(timestamp);
+          const hour = date.getUTCHours();
+          hourlyMap[hour] += volume;
+          hourlyCounts[hour] += 1;
+        });
+
+        labels = hourlyMap.map((_, i) => `${i}:00`);
+        volumeData = hourlyMap.map((sum, i) => sum); // No average, total volume per hour slot across 30 days
+      }
+
+      if (chart) chart.destroy();
+
+      const ctx = document.getElementById('volumeChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Volume (${plotType === 'daily' ? 'by Day' : 'by Hour'})`,
+            data: volumeData,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true },
+            title: {
+              display: true,
+              text: `Volume Trend for ${coinId.toUpperCase()} / USDT`
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Volume (USD)' }
+            },
+            x: {
+              ticks: {
+                autoSkip: true,
+                maxTicksLimit: 30
+              },
+              title: { display: true, text: plotType === 'daily' ? 'Date' : 'Hour of Day (UTC)' }
+            }
+          }
+        }
+      });
+    }
+
+    coinSelect.addEventListener('change', updateVolumeChart);
+    plotTypeSelect.addEventListener('change', updateVolumeChart);
+    updateVolumeChart();
+  </script>
+</body>
+</html>
